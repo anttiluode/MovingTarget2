@@ -6,6 +6,8 @@
 
 The simulator deliberately preserves six group-average phase signals. The result tests what that preservation makes possible. It does not demonstrate that a neural circuit naturally enforces this constraint.
 
+**New research map:** [Brains, languages and memory worlds](docs/memory-worlds-and-languages.md) connects the controlled result to cue-driven recall, multilingual representations and a proposed memory architecture using Antti's rooms, reflections and moons.
+
 ## The measured result
 
 Twenty seeds, 64 calibration pings and 512 independent held-out query points per seed; all seeds are retained. “Error” below is RMSE divided by the RMS initial response, not classification error or percentage accuracy.
@@ -43,12 +45,24 @@ The twelve-number code is 96 bytes in float64, versus 768 bytes for the 96 physi
 
 The experiment still holds the physical population. Its software listener reads individual phase advances; its drift controller allocates full-population arrays. Calibration uses copies of the initial state, and held-out targets are noiseless analytic responses. These costs and assumptions are [listed in RESULTS.md](RESULTS.md#costs-and-access). A compact description does not by itself make the physical system cheap to observe or maintain.
 
+## From moving responses to brains and languages
+
+The wider question is whether a partial cue can still recover the right object when the representation carrying it changes. Two research connections make that question more concrete:
+
+- **Brain:** [Horner et al. (2015)](https://www.nature.com/articles/ncomms8462) found that a cue could reinstate other associated event elements, including an element not requested by the task. This supports pattern completion as one mechanism for bringing an associated event back into the present.
+- **LLM:** [Anthropic](https://transformer-circuits.pub/2025/attribution-graphs/biology.html) found shared multilingual features alongside language-specific circuits in Claude 3.5 Haiku. [Wendler et al.](https://aclanthology.org/2024.acl-long.820/) found an English bias in intermediate representations of Llama-2 on selected next-token tasks. These findings motivate testing what survives changes of language.
+
+These are different systems and experiments. Their connection is a question about cue access and response preservation. The studies do not establish that a brain and a transformer store one identical invariant tensor, or that all language changes are invertible coordinate transformations.
+
+The [research guide](docs/memory-worlds-and-languages.md) includes the primary sources, a visual architecture map, and two proposed tests: cross-language access in a frozen model, and retrieval of old latent memories after an actual model update. It also distinguishes fading context from retained events, and source-supported recall from generated completion. **These extensions are proposals; this repository's measured results remain the oscillator experiment above.**
+
 ## Read or run
 
 - [RESULTS.md](RESULTS.md): all gates, uncertainty across seeds, costs and limits.
 - [MATH.md](MATH.md): exact finite-pulse law, moment expansion and failure of dynamical closure.
 - [PROTOCOL.md](PROTOCOL.md): thresholds and access rules committed before outcomes.
 - [PAPERS.md](PAPERS.md): primary literature and project genealogy.
+- [Memory worlds and languages](docs/memory-worlds-and-languages.md): brain and LLM connections, moon-to-memory mapping and proposed experiments.
 - [REVIEW.md](REVIEW.md): independent review, accounting correction and one deferred verifier limitation.
 - [Full receipt](results/receipt.json): every seed, calibration fit, trajectories and initial/final phases.
 
