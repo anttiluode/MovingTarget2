@@ -1,12 +1,18 @@
 # Brains, languages and memory worlds
 
-[Back to MovingTarget2](../README.md) · [Sources and ancestry](../PAPERS.md) · [Measured results](../RESULTS.md)
+[Back to MovingTarget2](../README.md) · [Geometry: AnttisBrain2](https://github.com/anttiluode/AnttisBrain2) · [Sources and ancestry](../PAPERS.md) · [Measured results](../RESULTS.md)
 
 > Can a partial cue recover the right object when the machinery representing it has changed?
 
-Antti's picture begins with a room containing moving moons and reflections. Riding a moon changes the frame from which the room is seen. Letting reflection depth represent age suggests a present containing compressed influences of earlier moments. Keeping selected traces somewhere addressable adds the possibility of recall.
+Antti's picture developed while exploring [AnttisBrain2](https://github.com/anttiluode/AnttisBrain2): a room containing moving moons and reflections. Imagining a ride with a moon changes the frame from which the room is seen. Letting reflection depth represent age suggests a present containing compressed influences of earlier moments. Keeping selected traces somewhere addressable adds the possibility of recall.
 
 The useful connection is between **a changing representation, a cue that still finds its target, and a response checked against retained evidence**. The geometry makes those roles visible. Establishing a mechanism requires defining and testing them separately.
+
+## The geometric origin: AnttisBrain2
+
+[AnttisBrain2](https://github.com/anttiluode/AnttisBrain2) supplies the visual setting: procedural chambers, moving optical moons, recursive reflections and an incoming webcam image. The memory architecture below grew out of looking at that renderer and asking what it would mean to stay steady relative to a moving moon, or to reopen a faded reflection.
+
+The proposed interpretation assigns a moon a local frame, a reflection a compressed view, and recorded depth an age. Those are roles for a future memory model. The renderer's bounce depth is a spatial/optical recursion count; temporal memory additionally requires retained earlier states. The link records the origin of the idea, rather than treating the graphics engine as a neuroscience experiment.
 
 ## What has evidence, and what is proposed?
 
@@ -45,7 +51,7 @@ A language change is not automatically an invertible coordinate change. Translat
 
 [Cross-language editing research](https://aclanthology.org/2024.findings-eacl.140/) has measured limited propagation of edits between languages in several models. That provides a useful failure to investigate. A failed answer alone cannot locate the failure: encoding, access, output behavior or the update itself could contribute.
 
-## C. Mapping the geometry to an AI architecture
+## C. Mapping AnttisBrain2's geometry to an AI architecture
 
 This is a design vocabulary. A *language moon* describes a perspective; a *memory moon* below is a selected stored item with a retrieval interface. They have different computational roles.
 

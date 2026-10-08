@@ -6,7 +6,7 @@
 
 The simulator deliberately preserves six group-average phase signals. The result tests what that preservation makes possible. It does not demonstrate that a neural circuit naturally enforces this constraint.
 
-**New research map:** [Brains, languages and memory worlds](docs/memory-worlds-and-languages.md) connects the controlled result to cue-driven recall, multilingual representations and a proposed memory architecture using Antti's rooms, reflections and moons.
+**New research map:** [Brains, languages and memory worlds](docs/memory-worlds-and-languages.md) connects the controlled result to cue-driven recall, multilingual representations and a proposed memory architecture inspired by [AnttisBrain2](https://github.com/anttiluode/AnttisBrain2)'s rooms, reflections and moving moons.
 
 ## The measured result
 
@@ -47,7 +47,7 @@ The experiment still holds the physical population. Its software listener reads 
 
 ## From moving responses to brains and languages
 
-The wider question is whether a partial cue can still recover the right object when the representation carrying it changes. Two research connections make that question more concrete:
+The wider question is whether a partial cue can still recover the right object when the representation carrying it changes. Exploring [AnttisBrain2](https://github.com/anttiluode/AnttisBrain2)'s moving moons and reflections supplied the geometric picture for this extension: a changing frame, fading context and an old world that a cue might reopen. Two research connections make that question more concrete:
 
 - **Brain:** [Horner et al. (2015)](https://www.nature.com/articles/ncomms8462) found that a cue could reinstate other associated event elements, including an element not requested by the task. This supports pattern completion as one mechanism for bringing an associated event back into the present.
 - **LLM:** [Anthropic](https://transformer-circuits.pub/2025/attribution-graphs/biology.html) found shared multilingual features alongside language-specific circuits in Claude 3.5 Haiku. [Wendler et al.](https://aclanthology.org/2024.acl-long.820/) found an English bias in intermediate representations of Llama-2 on selected next-token tasks. These findings motivate testing what survives changes of language.
