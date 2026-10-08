@@ -28,6 +28,18 @@ These sources motivate the [memory-worlds research guide](docs/memory-worlds-and
 | Zhang et al. (2025), [Frame Context Packing and Drift Prevention in Next-Frame-Prediction Video Diffusion Models](https://proceedings.neurips.cc/paper_files/paper/2025/hash/2bde8fef08f7ebe42b584266cbcfc909-Abstract-Conference.html), NeurIPS | Importance-based packing holds video context length fixed, with more capacity for important frames; separate methods address generation drift. | Compression can depend on importance rather than age alone. It does not validate a brain-memory model. |
 | Su et al. (2021; revised 2023), [RoFormer: Enhanced Transformer with Rotary Position Embedding](https://arxiv.org/abs/2104.09864) | RoPE rotates attention queries and keys according to token position. | Positional rotations do not repair changes caused by fine-tuning a model's learned representations. |
 
+## Möbius addendum
+
+These sources establish the group structure that [MOBIUS.md](MOBIUS.md) applies to MovingTarget2's reads.
+
+| Source | Relevant finding | Boundary for this project |
+|---|---|---|
+| Watanabe & Strogatz (1993), [Integrability of a globally coupled oscillator array](https://doi.org/10.1103/PhysRevLett.70.2391), Physical Review Letters 70, 2391 | N identical oscillators with global sinusoidal coupling reduce to three variables plus N − 3 constants of motion. | Their setting is a coupled array; here the same structure governs externally applied pings. |
+| Watanabe & Strogatz (1994), Constants of motion for superconducting Josephson arrays, Physica D 74, 197–253 | The reduction and its constants of motion worked out in full. | As above. |
+| Ott & Antonsen (2008), [Low dimensional behavior of large systems of globally coupled oscillators](https://doi.org/10.1063/1.2930766), Chaos 18, 037113 | An invariant manifold reduces large populations to a low-dimensional order-parameter equation. | Concerns infinite populations; the groups here have sixteen units. |
+| Pikovsky & Rosenblum (2008), [Partially integrable dynamics of hierarchical populations of coupled oscillators](https://doi.org/10.1103/PhysRevLett.101.264103), Physical Review Letters 101, 264103 | Watanabe–Strogatz reduction applied to interacting subpopulations. | Each group here receives its own pulse phase, which plays the role of a subpopulation drive. |
+| Marvel, Mirollo & Strogatz (2009), [Identical phase oscillators with global sinusoidal coupling evolve by Möbius group action](https://arxiv.org/abs/0904.1680), Chaos 19, 043104 | The dynamics is a Möbius group action on the circle; cross-ratios are its invariants. | The memory reading, the odometer and the halfway identity for the frozen law are this repository's measurements, not claims of the paper. |
+
 ## Project genealogy
 
 | Project | What carries forward |

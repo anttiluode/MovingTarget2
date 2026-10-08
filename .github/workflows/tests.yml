@@ -22,3 +22,5 @@ jobs:
         run: python -m unittest discover -s tests -v
       - name: Reproduce every frozen result
         run: python experiment.py --verify results/receipt.json
+      - name: Reproduce the Möbius addendum
+        run: python mobius_experiment.py --verify results/mobius_receipt.json

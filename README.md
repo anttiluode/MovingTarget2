@@ -39,6 +39,12 @@ Thirty-two actual weak reads, cycling four fixed queries, changed later weak res
 
 This uses unit-radius oscillators and instantaneous radial normalization between pulses. It is an idealized extension of [VMN's query-and-restore work](https://github.com/anttiluode/VMN), not a new measured physical interface.
 
+## Möbius addendum: reads that compose
+
+If each read is the exact flow that the frozen law approximates, every read is a Möbius map of the circle, and any sequence of reads is one three-number group element per group. An observer that remembered only which pings it sent, 18 numbers and no phase access, undid 32 weak reads to within 7×10⁻¹⁵ rad in every seed, using two pulses per group. Each group's 13 cross-ratios, the shape of its constellation, stayed fixed to within 5×10⁻¹⁴: reads use that shape but cannot write it, while the frozen drift rewrites it.
+
+The frozen law turns out to be exactly half of a Möbius map. That is why its reversed-pulse compensation leaves 1.51% rather than the 0.83% drift floor. Six gates were committed before the run and all passed: [MOBIUS.md](MOBIUS.md).
+
 ## What the small code costs
 
 The twelve-number code is 96 bytes in float64, versus 768 bytes for the 96 physical angles: **eightfold per-object payload reduction** for weak-response emulation. The shared query-mode table adds 96 bytes. The estimator uses 64 noisy reset pings and a 6,144-byte design matrix. Fixed group identity and a known response law are part of the model.
@@ -65,6 +71,7 @@ The [research guide](docs/memory-worlds-and-languages.md) includes the primary s
 - [Memory worlds and languages](docs/memory-worlds-and-languages.md): brain and LLM connections, moon-to-memory mapping and proposed experiments.
 - [REVIEW.md](REVIEW.md): independent review, accounting correction and one deferred verifier limitation.
 - [Full receipt](results/receipt.json): every seed, calibration fit, trajectories and initial/final phases.
+- [MOBIUS.md](MOBIUS.md) and [MOBIUS_PROTOCOL.md](MOBIUS_PROTOCOL.md): Möbius-ping addendum, its frozen gates and [receipt](results/mobius_receipt.json).
 
 ```bash
 python -m pip install -r requirements.txt
@@ -72,6 +79,7 @@ python -m unittest discover -s tests -v
 python experiment.py                         # full twenty-seed run
 python experiment.py --verify results/receipt.json
 python experiment.py --smoke --output /tmp/movingtarget2-smoke.json
+python mobius_experiment.py --verify results/mobius_receipt.json   # Möbius addendum, ~13 min
 ```
 
 The recorded full run used Python 3.12.14 and NumPy 2.3.5 on CPU. Verification permits small floating-point differences. A smoke run makes no full-gate claims; `--verify` checks all reported fields and values, although it is not a strict JSON type validator.
