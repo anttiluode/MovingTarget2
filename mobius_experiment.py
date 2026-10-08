@@ -20,7 +20,7 @@ from experiment import (
 )
 from mobius import (
     Odometer, _levenberg_marquardt, act, apply_mobius_ping, constellation_change,
-    from_coordinates, group_phases, harmonic_pulse, mobius_pulse,
+    group_phases, harmonic_pulse, mobius_pulse,
     pulses_for, to_coordinates, wrap,
 )
 from moving_target import apply_ping, drift_step, exact_response, wrapped_difference
@@ -63,36 +63,92 @@ def _numeric_jacobian(function):
 
 
 def _disk(u):
-    """Unconstrained pair -> point strictly inside the unit disk."""
-    value = u[0] + 1j*u[1]
-    return value/np.sqrt(1 + abs(value)**2)
+    """Pair -> disk point whose hyperbolic distance from 0 is |u| (capped at 30).
+
+    Uniform in hyperbolic distance, so large corrections near the boundary stay
+    well conditioned for the least-squares fits.
+    """
+    radius = float(np.hypot(u[0], u[1]))
+    if radius < 1e-12:
+        return .5*(u[0] + 1j*u[1])
+    return np.tanh(min(radius, 30.)/2)*(u[0] + 1j*u[1])/radius
 
 
 def _undisk(w):
-    scale = 1/np.sqrt(1 - abs(w)**2)
-    return np.array([(w*scale).real, (w*scale).imag])
+    radius = abs(w)
+    if radius == 0:
+        return np.zeros(2)
+    distance = 2*np.arctanh(radius)
+    return np.array([(w/radius*distance).real, (w/radius*distance).imag])
 
 
-def _best_fit(apply, after, initial, start_points):
+def disk_map_then_rotate(parameters, theta):
+    """Möbius map z -> e^{i psi} (z + v)/(1 + conj(v) z), v = _disk(parameters[:2])."""
+    v = _disk(parameters[:2])
+    z = np.exp(1j*np.asarray(theta, dtype=float))
+    return wrap(np.angle((z + v)/(1 + np.conj(v)*z)) + parameters[2])
+
+
+def _hyperbolic_grid_starts(after, initial, keep=4):
+    """Coarse grid over v in the disk; the best rotation for each v is a circular mean.
+
+    Radii are evenly spaced in hyperbolic distance out to 10 (|v| = tanh(5)), so
+    large corrections are reachable from a nearby start.
+    """
+    z = np.exp(1j*after)
+    candidates = []
+    for distance in np.linspace(0, 10, 41):
+        radius = np.tanh(distance/2)
+        for angle in (np.linspace(-np.pi, np.pi, 48, endpoint=False) if radius > 0 else [0.]):
+            v = radius*np.exp(1j*angle)
+            mapped = np.angle((z + v)/(1 + np.conj(v)*z))
+            psi = float(np.angle(np.mean(np.exp(1j*(initial - mapped)))))
+            candidates.append((_phase_rms(mapped + psi, initial), v, psi))
+    candidates.sort(key=lambda row: row[0])
+    return [np.r_[_undisk(v), psi] for _, v, psi in candidates[:keep]]
+
+
+def _parameters_from_matrix(matrix):
+    """SU(1,1) element -> (u, psi) with map e^{i psi}(z + v)/(1 + conj(v) z), v = _disk(u)."""
+    coordinates = to_coordinates(matrix)          # matrix = M_w after a rotation psi
+    w = coordinates[0] + 1j*coordinates[1]
+    return np.r_[_undisk(w*np.exp(-1j*coordinates[2])), coordinates[2]]
+
+
+def _matrix_from_parameters(parameters):
+    v, psi = _disk(parameters[:2]), parameters[2]
+    return np.array([[np.exp(.5j*psi), np.exp(.5j*psi)*v],
+                     [np.exp(-.5j*psi)*np.conj(v), np.exp(-.5j*psi)]])/np.sqrt(1 - abs(v)**2)
+
+
+def oracle_best_mobius_map(after, initial, guess_matrix, starts, seed):
+    """Best single Möbius map for one group, fitted against hidden initial phases.
+
+    Strong reads compress a group into a tiny arc, so the correcting map is a
+    large expansion whose basin is very narrow. The first start therefore fits
+    the well-conditioned forward map (initial -> after) and inverts it. Returns
+    the corrected phases and the fitted map as an SU(1,1) matrix.
+    """
+    rng = np.random.default_rng(seed)
+    forward, _ = _levenberg_marquardt(
+        _numeric_jacobian(lambda p: wrap(disk_map_then_rotate(p, initial) - after)),
+        _parameters_from_matrix(np.linalg.inv(guess_matrix)))
+    start_points = [_parameters_from_matrix(np.linalg.inv(_matrix_from_parameters(forward))),
+                    _parameters_from_matrix(guess_matrix), np.zeros(3)]
+    start_points += _hyperbolic_grid_starts(after, initial)
+    start_points += [np.r_[rng.normal(0, 3., 2), rng.uniform(-np.pi, np.pi)] for _ in range(starts)]
+    best = _best_parameters(disk_map_then_rotate, after, initial, start_points)
+    return disk_map_then_rotate(best, after), _matrix_from_parameters(best)
+
+
+def _best_parameters(apply, after, initial, start_points):
     best = (None, np.inf)
     for start in start_points:
         x, _ = _levenberg_marquardt(_numeric_jacobian(lambda p: wrap(apply(p, after) - initial)), start)
         error = _phase_rms(apply(x, after), initial)
         if error < best[1]:
             best = (x, error)
-    return apply(best[0], after)
-
-
-def oracle_best_mobius_map(after, initial, guess_matrix, starts, seed):
-    """Best single Möbius map for one group, fitted against hidden initial phases."""
-    def apply(p, theta):
-        w = _disk(p[:2])
-        return act(from_coordinates([w.real, w.imag, p[2]]), theta)
-    rng = np.random.default_rng(seed)
-    guess = to_coordinates(guess_matrix)
-    start_points = [np.r_[_undisk(guess[0] + 1j*guess[1]), guess[2]], np.zeros(3)]
-    start_points += [np.r_[rng.normal(0, .3, 2), rng.uniform(-np.pi, np.pi)] for _ in range(starts)]
-    return _best_fit(apply, after, initial, start_points)
+    return best[0]
 
 
 def frozen_pulse_sequence(parameters, theta):
@@ -103,16 +159,24 @@ def frozen_pulse_sequence(parameters, theta):
     return wrap(x)
 
 
-def oracle_best_frozen_pulses(after, initial, guess_pulses, count, starts, seed):
+def _frozen_start(pulses, count):
+    """Map Möbius pulses (phi, tau) to frozen pulses with amplitude tanh(tau).
+
+    The frozen pulse with amplitude a has slopes 1/(1+a) and 1/(1-a) at its two
+    fixed points; the Möbius pulse of duration atanh(a) matches their geometric
+    mean, so a = tanh(tau) is the natural first guess.
+    """
+    padded = list(pulses)[:count] + [(0., 0.)]*max(0, count - len(pulses))
+    return np.ravel([[phi, np.arctanh(np.clip(np.tanh(tau), -.98, .98)/.99)] for phi, tau in padded])
+
+
+def oracle_best_frozen_pulses(after, initial, guess_sets, count, starts, seed):
     """Best `count` frozen-law pulses for one group, fitted against hidden initial phases."""
     rng = np.random.default_rng(seed)
-    start_points = []
-    if len(guess_pulses) <= count:
-        padded = list(guess_pulses) + [(0., 0.)]*(count - len(guess_pulses))
-        start_points.append(np.ravel([[phi, np.arctanh(np.clip(tau, -.98, .98)/.99)] for phi, tau in padded]))
+    start_points = [_frozen_start(pulses, count) for pulses in guess_sets if len(pulses) <= count]
     start_points += [np.ravel([[rng.uniform(-np.pi, np.pi), rng.normal(0, .3)] for _ in range(count)])
                      for _ in range(starts)]
-    return _best_fit(frozen_pulse_sequence, after, initial, start_points)
+    return frozen_pulse_sequence(_best_parameters(frozen_pulse_sequence, after, initial, start_points), after)
 
 
 def _listener(state, held_out, reference, amplitude):
@@ -187,8 +251,10 @@ def burst_protocol(seed, initial, held_out, references, amplitude, config):
         pulse_counts.append(len(pulses))
         durations += [abs(tau) for _, tau in pulses]
         solve_errors.append(error)
-        oracle_map[g] = oracle_best_mobius_map(frozen[g], initial[g], inverse, config.oracle_starts, 7919*seed+g)
-        oracle_pulses[g] = oracle_best_frozen_pulses(frozen[g], initial[g], pulses, 3,
+        oracle_map[g], fitted = oracle_best_mobius_map(frozen[g], initial[g], inverse,
+                                                       config.oracle_starts, 7919*seed+g)
+        fitted_pulses, _ = pulses_for(fitted, max_pulses=3, seed=2000*seed+g)
+        oracle_pulses[g] = oracle_best_frozen_pulses(frozen[g], initial[g], [pulses, fitted_pulses], 3,
                                                      config.oracle_starts, 7907*seed+g)
     states = {
         'frozen_uncorrected': frozen,

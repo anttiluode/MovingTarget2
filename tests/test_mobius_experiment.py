@@ -5,10 +5,12 @@ import unittest
 
 import numpy as np
 
-from experiment import Config, WAVEVECTORS, calibration_data
-from mobius import frozen_pulse
-from mobius_experiment import MobiusConfig, burst_protocol, frozen_pulse_sequence, sequential_protocol
-from moving_target import exact_response
+from experiment import Config, READ_QUERIES, WAVEVECTORS, calibration_data
+from mobius import Odometer, act, frozen_pulse, group_phases
+from mobius_experiment import (
+    MobiusConfig, burst_protocol, frozen_pulse_sequence, oracle_best_mobius_map, sequential_protocol,
+)
+from moving_target import apply_ping, exact_response
 
 ROOT = Path(__file__).resolve().parents[1]
 
@@ -40,6 +42,21 @@ class MobiusHarnessTests(unittest.TestCase):
         self.assertLessEqual(max(result['odometer']['correction_pulses_per_group']), 3)
         self.assertGreater(result['frozen_per_read_flip']['phase_rms_error'], 1e-8)
         self.assertGreater(result['mobius_uncorrected']['phase_rms_error'], .1)
+
+    def test_oracle_finds_the_narrow_basin_after_strong_reads(self):
+        # Seed 4108, group 5, 32 frozen reads at a = 0.25: the group collapses to a tiny
+        # arc. A 150-start brute-force search found 0.038 rad; a naive fit stalls near 1 rad.
+        split = calibration_data(4108, Config())
+        initial = split['phases']
+        frozen, odometer = initial.copy(), Odometer(len(WAVEVECTORS))
+        for read in range(32):
+            query = READ_QUERIES[read % len(READ_QUERIES)]
+            frozen = apply_ping(frozen, WAVEVECTORS, query, .25)
+            odometer.record(group_phases(WAVEVECTORS, query), .25)
+        corrected, matrix = oracle_best_mobius_map(frozen[5], initial[5], odometer.inverse_matrices()[5], 2, 0)
+        error = np.sqrt(np.mean(np.angle(np.exp(1j*(corrected - initial[5])))**2))
+        self.assertLess(error, .045)
+        np.testing.assert_allclose(np.angle(np.exp(1j*(act(matrix, frozen[5]) - corrected))), 0, atol=1e-10)
 
     def test_fast_frozen_sequence_equals_frozen_pulses(self):
         theta = np.random.default_rng(2).uniform(-np.pi, np.pi, 50)

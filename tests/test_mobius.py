@@ -4,7 +4,7 @@ import unittest
 import numpy as np
 
 from mobius import (
-    Odometer, act, apply_mobius_ping, constellation_change, cross_ratios,
+    Odometer, act, apply_mobius_ping, constellation_change, cross_ratios, shape_angles,
     frozen_pulse, from_coordinates, halfway_identity_error, harmonic_pulse,
     mobius_pulse, pulse_matrix, pulses_for, to_coordinates, wrap,
 )
@@ -85,6 +85,12 @@ class GroupTests(unittest.TestCase):
         back = mobius_pulse(there, .8, -.3)
         np.testing.assert_allclose(wrap(back - self.theta), 0, atol=1e-13)
 
+    def test_large_translations_decompose_without_overflow(self):
+        with np.errstate(over='raise', invalid='raise'):
+            pulses, error = pulses_for(pulse_matrix(.3, 30.), max_pulses=3)
+        self.assertLess(error, 1e-10)
+        self.assertTrue(all(np.isfinite(tau) for _, tau in pulses))
+
     def test_three_pulses_write_any_element_needed_and_two_cannot_rotate(self):
         rotation = np.diag([np.exp(.05j), np.exp(-.05j)])
         pulses, error = pulses_for(rotation, max_pulses=2, starts=30)
@@ -104,10 +110,34 @@ class ConstellationTests(unittest.TestCase):
         self.phases = rng.uniform(-np.pi, np.pi, (2, 9))
         self.phis = rng.uniform(-np.pi, np.pi, 50)
 
-    def test_cross_ratios_of_circle_points_are_real(self):
-        real, imaginary = cross_ratios(self.phases)
-        self.assertEqual(real.shape, (2, 6))
-        self.assertLess(np.max(np.abs(imaginary)), 1e-12*np.max(np.abs(real)))
+    def test_cross_ratios_match_the_complex_definition(self):
+        # CR(z0, z1, z2, zj) = (z0 - z2)(z1 - zj) / ((z0 - zj)(z1 - z2)), real on a circle.
+        z = np.exp(1j*self.phases)
+        complex_ratio = (z[:, :1] - z[:, 2:3])*(z[:, 1:2] - z[:, 3:])/((z[:, :1] - z[:, 3:])*(z[:, 1:2] - z[:, 2:3]))
+        self.assertLess(np.max(np.abs(complex_ratio.imag)), 1e-12*np.max(np.abs(complex_ratio.real)))
+        ratio = cross_ratios(self.phases)
+        self.assertEqual(ratio.shape, (2, 6))
+        np.testing.assert_allclose(ratio, complex_ratio.real, rtol=1e-12)
+        # A 2 pi relabelling of one phase must not change anything.
+        shifted = self.phases.copy()
+        shifted[0, 1] += 2*np.pi
+        np.testing.assert_allclose(cross_ratios(shifted), ratio, rtol=1e-12)
+
+    def test_cross_ratios_keep_precision_for_nearly_coincident_points(self):
+        phases = np.array([[0., 1e-9, 2.0, 1e-9 + 3e-12, -1.]])
+        exact = (np.sin(-1.0)*np.sin(-1.5e-12)) / (np.sin(-(1e-9 + 3e-12)/2)*np.sin((1e-9 - 2.0)/2))
+        self.assertAlmostEqual(cross_ratios(phases)[0, 0]/exact, 1, places=9)
+        self.assertTrue(np.all(np.isfinite(cross_ratios(phases))))
+
+    def test_shape_angles_stay_defined_when_points_collapse(self):
+        phases = np.array([[0., .4, 1.1, 0., 2.0, .4]])   # unit 3 sits on unit 0, unit 5 on unit 1
+        with np.errstate(all='raise'):
+            angles = shape_angles(phases)
+        self.assertTrue(np.all(np.isfinite(angles)))
+        self.assertAlmostEqual(abs(angles[0, 0]), np.pi/2, places=12)   # CR infinite
+        self.assertAlmostEqual(angles[0, 2], 0., places=12)              # CR zero
+        regular = np.arctan(cross_ratios(phases)[0, 1])
+        self.assertAlmostEqual(angles[0, 1], regular, places=12)
 
     def test_mobius_pings_never_change_the_constellation(self):
         x = self.phases.copy()

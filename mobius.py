@@ -183,9 +183,27 @@ def _word_residual_and_jacobian(parameters, target):
     return residual, jacobian
 
 
+def _evaluate(function, x):
+    """Residual and Jacobian, or None when the trial point leaves the finite domain."""
+    if not np.all(np.isfinite(x)):
+        return None
+    try:
+        with np.errstate(over='ignore', invalid='ignore', divide='ignore'):
+            residual, jacobian = function(x)
+    except ValueError:
+        return None
+    if not (np.all(np.isfinite(residual)) and np.all(np.isfinite(jacobian))):
+        return None
+    return residual, jacobian
+
+
 def _levenberg_marquardt(function, start, iterations=200, tolerance=1e-28):
+    """Damped Gauss-Newton. Non-finite trial points are rejected like uphill steps."""
     x = np.array(start, dtype=float)
-    residual, jacobian = function(x)
+    evaluated = _evaluate(function, x)
+    if evaluated is None:
+        return x, float('inf')
+    residual, jacobian = evaluated
     cost, damping = residual @ residual, 1e-3
     for _ in range(iterations):
         if cost < tolerance:
@@ -196,7 +214,11 @@ def _levenberg_marquardt(function, start, iterations=200, tolerance=1e-28):
         while damping < 1e12:
             step = np.linalg.solve(normal + damping*(np.diag(np.diag(normal)) + 1e-12*np.eye(len(x))), -gradient)
             trial = x + step
-            trial_residual, trial_jacobian = function(trial)
+            evaluated = _evaluate(function, trial)
+            if evaluated is None:
+                damping *= 4
+                continue
+            trial_residual, trial_jacobian = evaluated
             trial_cost = trial_residual @ trial_residual
             if trial_cost < cost:
                 x, residual, jacobian, cost = trial, trial_residual, trial_jacobian, trial_cost
@@ -240,20 +262,46 @@ def pulses_for(matrix, max_pulses=3, starts=40, seed=0, tolerance=1e-13):
 # The constellation: cross-ratios that Möbius pings cannot change
 # ---------------------------------------------------------------------------
 
-def cross_ratios(phases):
-    """Per group, CR(z0, z1, z2, zj) for j >= 3: U - 3 real numbers per group."""
+def _cross_ratio_parts(phases):
+    """Numerator and denominator of CR(z0, z1, z2, zj), j >= 3: U - 3 per group.
+
+    Uses z_a - z_b = 2i sin(d/2) exp(i(theta_b + d/2)), d = wrap(theta_a - theta_b),
+    so nearby points keep full relative precision and the result is exactly real.
+    The leftover phase factor is exactly +1 or -1 and is applied as a sign.
+    """
     phases = np.asarray(phases, dtype=float)
     if phases.ndim != 2 or phases.shape[1] < 4:
         raise ValueError('cross-ratios need a (groups, units >= 4) phase matrix')
-    z = np.exp(1j*phases)
-    z0, z1, z2, zj = z[:, :1], z[:, 1:2], z[:, 2:3], z[:, 3:]
-    ratio = (z0 - z2)*(z1 - zj)/((z0 - zj)*(z1 - z2))
-    return ratio.real, ratio.imag
+    t0, t1, t2, tj = phases[:, :1], phases[:, 1:2], phases[:, 2:3], phases[:, 3:]
+    # Subtracting a multiple of 2 pi only when needed keeps tiny differences exact;
+    # wrap() would add pi first and round them away.
+    principal = lambda x: x - 2*np.pi*np.round(x/(2*np.pi))
+    d02, d1j, d0j, d12 = principal(t0 - t2), principal(t1 - tj), principal(t0 - tj), principal(t1 - t2)
+    sign = np.where(np.cos((d02 + d1j - d0j - d12)/2) >= 0, 1., -1.)
+    return sign*np.sin(d02/2)*np.sin(d1j/2), np.sin(d0j/2)*np.sin(d12/2)
+
+
+def cross_ratios(phases):
+    """Per group, CR(z0, z1, z2, zj) for j >= 3. Infinite where z0 and zj coincide."""
+    numerator, denominator = _cross_ratio_parts(phases)
+    with np.errstate(divide='ignore', invalid='ignore'):
+        return numerator/denominator
+
+
+def shape_angles(phases):
+    """atan of every cross-ratio, in [-pi/2, pi/2], defined even for coincident points.
+
+    Points that a state has collapsed onto each other (to double precision)
+    give pi/2 or 0 here: their contribution to the shape is lost.
+    """
+    numerator, denominator = _cross_ratio_parts(phases)
+    sign = np.where(denominator < 0, -1., 1.)
+    return np.arctan2(sign*numerator, sign*denominator)
 
 
 def constellation_change(before, after):
     """|atan X' - atan X| per cross-ratio: bounded, scale-free, order preserving."""
-    return np.abs(np.arctan(cross_ratios(after)[0]) - np.arctan(cross_ratios(before)[0]))
+    return np.abs(shape_angles(after) - shape_angles(before))
 
 
 def halfway_identity_error(theta, phi, amplitude):
